@@ -1,0 +1,10 @@
+google-genai
+langchain
+langchain-community
+chromadb
+streamlit
+pypdf
+python-dotenv
+sentence-transformers
+reportlab
+

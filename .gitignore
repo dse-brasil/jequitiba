@@ -1,0 +1,19 @@
+# Configurações locais e chaves
+.env
+
+# Python cache e executáveis
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# Banco de dados vetorial e dados locais (ignorar exceto o .gitkeep)
+data/vector_store/*
+!data/vector_store/.gitkeep
+data/raw_contracts/*
+!data/raw_contracts/.gitkeep
+
+# IDEs
+.vscode/
+.idea/
