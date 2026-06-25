@@ -123,9 +123,11 @@ def display_chunks(chunks: List[Dict]):
 # Cabeçalho
 col1, col2 = st.columns([1, 6])
 with col1:
-    st.image(os.path.join(BASE_DIR, "logo_jequitiba.png"), width=120) if os.path.exists(
-        os.path.join(BASE_DIR, "logo_jequitiba.png")
-    ) else st.title("🌳")
+    logo_file = os.path.join(BASE_DIR, "logo_jequitiba.png")
+    if os.path.exists(logo_file):
+        st.image(logo_file, width=120)
+    else:
+        st.title("🌳")
 with col2:
     st.title("Projeto Jequitibá")
     st.subheader("Assistente Jurídico Inteligente com RAG e LLMs")
