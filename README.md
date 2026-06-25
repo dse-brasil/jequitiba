@@ -16,6 +16,7 @@
   <img src="https://img.shields.io/badge/LangChain-%F0%9F%A6%9C%F0%9F%94%97-black?style=for-the-badge" alt="LangChain">
   <img src="https://img.shields.io/badge/LLM-Gemini%20%2B%20LoRA-blue?style=for-the-badge" alt="LLM">
   <img src="https://img.shields.io/badge/Vector_DB-Chroma-orange?style=for-the-badge" alt="ChromaDB">
+  <img src="https://img.shields.io/badge/API-Datajud_CNJ-purple?style=for-the-badge" alt="Datajud API">
   <img src="https://img.shields.io/badge/Focus-NLP%20%26%20Law-green?style=for-the-badge" alt="LegalTech">
 </div>
 
@@ -25,9 +26,9 @@
 
 O **Projeto Jequitibá** é uma iniciativa de pesquisa desenvolvida no âmbito do Mestrado do Instituto de Ciências Matemáticas e de Computação (ICMC-USP), dedicada à aplicação de Inteligência Artificial para análise e interpretação de documentos jurídicos complexos. Seu principal produto é o **Legal RAG Assistant (LRA)**, um assistente jurídico contextual baseado em técnicas de Retrieval-Augmented Generation (RAG) e Grandes Modelos de Linguagem (LLMs).
 
-A solução foi concebida para enfrentar dois dos principais desafios atuais da aplicação de LLMs ao domínio domínio jurídico: a ocorrência de alucinações e as limitações de contexto ao analisar grandes volumes documentais. Para isso, utiliza uma arquitetura baseada em RAG, na qual contratos, pareceres e outros documentos jurídicos são processados, segmentados em trechos semanticamente coerentes e armazenados em um banco vetorial. Quando uma consulta é realizada, os fragmentos mais relevantes são recuperados e utilizados como contexto para a geração da resposta, garantindo que o modelo produza informações estritamente fundamentadas nos documentos fornecidos.
+A solução foi concebida para enfrentar dois dos principais desafios atuais da aplicação de LLMs ao domínio jurídico: a ocorrência de alucinações e as limitações de contexto ao analisar grandes volumes documentais. Para isso, utiliza uma arquitetura baseada em RAG, na qual contratos, pareceres e outros documentos jurídicos são processados, segmentados em trechos semanticamente coerentes e armazenados em um banco vetorial. 
 
-Além de responder perguntas, o sistema é projetado para indicar as fontes exatas que sustentam cada afirmação, incluindo referências a cláusulas e páginas específicas. Essa característica promove transparência, auditabilidade e confiança, requisitos essenciais para aplicações no contexto jurídico.
+Adicionalmente, o sistema conta com integração nativa com a **API Pública do Datajud (CNJ)**. Quando uma consulta é realizada, se o usuário citar o número de um processo judicial unificado, o sistema busca os metadados e o andamento processual em tempo real na base nacional, agregando essas informações como contexto dinâmico para a IA.
 
 ---
 
@@ -47,19 +48,22 @@ A arquitetura do sistema segue um fluxo estruturado de ingestão, indexação, r
 
 1. **Ingestão:** Documentos jurídicos em formato PDF são processados e divididos em fragmentos semanticamente coerentes (chunks) usando divisores recursivos para preservar o contexto de cláusulas.
 2. **Embedding:** Esses fragmentos são convertidos em representações vetoriais por meio de modelos de embeddings (BERTimbau base em português).
-3. **Indexação/Vector Store:** Armazenamento dos embeddings em um banco vetorial local (ChromaDB) para recuperação rápida e eficiente.
-4. **Recuperação:** Quando uma consulta é realizada, o sistema realiza uma busca de similaridade e identifica os trechos (chunks) mais relevantes.
-5. **Geração:** O modelo de linguagem recebe os trechos recuperados como contexto e gera respostas estritamente baseadas nas evidências, indicando precisamente as fontes e páginas consultadas.
+3. **Indexação/Vector Store:** Armazenamento dos embeddings em um banco vetorial local (ChromaDB) usando similaridade de cosseno para garantir scores de relevância precisos e normalizados entre 0 e 1.
+4. **Roteamento de Consulta (Datajud):** Se o usuário incluir um número CNJ de 20 dígitos na pergunta, o roteador consulta a API Pública do Datajud (CNJ), identificando o tribunal de origem automaticamente (TRFs, TRTs, TREs, TJs estaduais ou TJMs) e extraindo a última linha do tempo de movimentações processuais.
+5. **Recuperação e Geração:** O modelo de linguagem (Gemini) recebe a união do contexto vetorial recuperado do ChromaDB e os metadados em tempo real do Datajud para gerar respostas estritamente fundamentadas, indicando precisamente as fontes e páginas consultadas.
 
 ```mermaid
 graph TD
-    A[Usuário: Pergunta Jurídica] --> B(Modelo de Embedding BERTimbau)
-    B --> C{Busca por Similaridade}
-    D[Documentos PDF] --> E[Chunking Semântico] --> F[Geração de Embeddings] --> C
-    C -->|Trechos Relevantes + Páginas| G[Prompt com Contexto Rígido]
-    A --> G
-    G --> H[Gemini + Adaptador LoRA]
-    H --> I[Resposta Fundamentada com Citações]
+    A[Usuário: Pergunta Jurídica / Processo CNJ] --> B(Modelo de Embedding BERTimbau)
+    B --> C{Roteador de Consulta}
+    D[Documentos PDF] --> E[Chunking Semântico] --> F[Geração de Embeddings] --> G[ChromaDB]
+    C -->|Pesquisa Semântica| G
+    C -->|Se houver nº CNJ| H[API Pública do Datajud CNJ]
+    G -->|Trechos Relevantes + Páginas| I[Prompt com Contexto Rígido]
+    H -->|Metadados + Linha do Tempo| I
+    A --> I
+    I --> J[Gemini 2.5 Flash]
+    J --> K[Resposta Fundamentada com Citações]
 ```
 
 ---
@@ -76,10 +80,16 @@ graph TD
 ├── /src
 │   ├── ingest.py            # Script de Chunking e Embedding (BERTimbau)
 │   ├── rag_engine.py        # Lógica de Retrieval e Integração RAG (Gemini)
-│   └── prompts.py           # Templates de Prompt (Engenharia de Prompt)
+│   ├── prompts.py           # Templates de Prompt (Engenharia de Prompt)
+│   └── datajud_client.py    # Cliente de Integração com a API Pública do Datajud (CNJ)
 │
 ├── /app
-│   └── streamlit_app.py     # Interface de Chat (Streamlit)
+│   └── streamlit_app.py     # Interface de Chat e Consulta com Material Design (Streamlit)
+│
+├── /scratch
+│   ├── create_synthetic_pdf.py  # Gerador de PDF de teste
+│   ├── test_pipeline.py         # Teste básico de RAG
+│   └── test_datajud.py          # Teste integrado da API Datajud
 │
 ├── .env.example             # Exemplo de configuração (Chaves de API)
 ├── requirements.txt
@@ -90,8 +100,8 @@ graph TD
 
 ## 🛡️ Salvaguardas contra Alucinação (Prompt Engineering)
 Para garantir a confiabilidade exigida por profissionais do direito:
-- **Token "Não Sei":** O modelo é explicitamente instruído a recusar respostas se o contexto recuperado não for suficiente, em vez de criar informações.
-- **Rastreabilidade de Fontes:** Retorno obrigatório de metadados como número da página e nome do documento para auditoria humana.
+- **Token "Não Encontrei":** O modelo é explicitamente instruído a recusar respostas se o contexto recuperado não for suficiente, em vez de criar informações.
+- **Rastreabilidade de Fontes:** Retorno obrigatório de metadados como número da página, nome do documento ou cabeçalho do processo (Datajud) para auditoria humana.
 - **Temperatura Zero:** Configuração para geração estritamente determinística das respostas.
 
 ---
@@ -101,8 +111,9 @@ Para garantir a confiabilidade exigida por profissionais do direito:
 - **Orquestração:** LangChain
 - **LLM Base:** Google Gemini (via SDK `google-genai`)
 - **Ajuste Fino:** PEFT / LoRA para especialização em linguagem jurídica brasileira, extração de entidades e geração de relatórios de auditoria documental.
-- **Vector Database:** ChromaDB (persistência local)
-- **Interface:** Streamlit
+- **Consulta Externa:** API Pública do Datajud (CNJ)
+- **Vector Database:** ChromaDB (persistência local usando Cosine Similarity)
+- **Interface:** Streamlit ( estilizada com fonte Google Fonts *Outfit* e *Material Symbols*)
 - **Embeddings:** BERTimbau (`neuralmind/bert-base-portuguese-cased`) via HuggingFace
 
 ---

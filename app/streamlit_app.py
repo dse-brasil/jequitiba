@@ -1,5 +1,5 @@
 """
-streamlit_app.py - Interface do Projeto Jequitibá (versão avançada)
+streamlit_app.py - Interface do Projeto Jequitibá (versão avançada com Material Design)
 """
 
 import streamlit as st
@@ -30,11 +30,116 @@ from src.rag_engine import JequitibaRAGEngine
 # ============================
 # CONFIGURAÇÕES DO STREAMLIT
 # ============================
+logo_path = os.path.join(BASE_DIR, "logo_jequitiba.png")
+
 st.set_page_config(
     page_title="Projeto Jequitibá - Assistente Jurídico",
-    page_icon="🌳",
+    page_icon=logo_path if os.path.exists(logo_path) else "🌳",
     layout="wide",
     initial_sidebar_state="expanded",
+)
+
+# ============================
+# CONFIGURAÇÕES DE DESIGN (MATERIAL DESIGN E CSS PERSONALIZADO)
+# ============================
+st.markdown(
+    """
+    <!-- Fonte e Ícones do Google -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+    
+    <style>
+    /* Estilização Geral com a fonte Outfit */
+    html, body, [class*="css"], .stMarkdown, p, div, label {
+        font-family: 'Outfit', sans-serif !important;
+    }
+    
+    /* Classe para ícones do Material Design */
+    .material-symbols-outlined {
+        vertical-align: middle;
+        margin-right: 6px;
+        display: inline-block;
+    }
+    
+    /* Títulos e Headers */
+    .app-title {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin: 0;
+        padding: 0;
+        background: linear-gradient(45deg, #1b5e20, #4caf50);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    .app-subtitle {
+        font-size: 1.1rem;
+        color: #757575;
+        margin-top: 5px;
+        margin-bottom: 20px;
+    }
+    
+    /* Elemento da logo com animação suave de flutuação */
+    .logo-container {
+        animation: float 4s ease-in-out infinite;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    @keyframes float {
+        0% { transform: translateY(0px); }
+        50% { transform: translateY(-6px); }
+        100% { transform: translateY(0px); }
+    }
+    
+    /* Estilização dos Expanders (Fontes e Chunks) */
+    div[data-testid="stExpander"] {
+        border: 1px solid rgba(46, 125, 50, 0.15);
+        background-color: rgba(46, 125, 50, 0.02);
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        transition: all 0.3s ease;
+    }
+    div[data-testid="stExpander"]:hover {
+        border-color: rgba(46, 125, 50, 0.4);
+        background-color: rgba(46, 125, 50, 0.04);
+        box-shadow: 0 6px 18px rgba(46, 125, 50, 0.08);
+    }
+    
+    /* Botões personalizados com micro-animações */
+    button[kind="secondary"] {
+        border-radius: 8px !important;
+        border: 1px solid rgba(46, 125, 50, 0.3) !important;
+        background-color: transparent !important;
+        font-weight: 600 !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+    button[kind="secondary"]:hover {
+        transform: translateY(-2px);
+        border-color: #2e7d32 !important;
+        color: #2e7d32 !important;
+        box-shadow: 0 4px 10px rgba(46, 125, 50, 0.12) !important;
+    }
+    button[kind="secondary"]:active {
+        transform: translateY(0);
+    }
+    
+    /* Alinhamento de status de sucesso e erro */
+    .status-active {
+        color: #2e7d32;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        margin-top: 10px;
+    }
+    .status-inactive {
+        color: #c62828;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        margin-top: 10px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
 )
 
 # ============================
@@ -88,49 +193,50 @@ def log_query(query: str, answer: str, sources: List[Dict], duration: float):
         "params": st.session_state.rag_params,
     }
     logger.info(f"Consulta processada: {json.dumps(log_entry, ensure_ascii=False)}")
-    # Opcional: salvar em arquivo
-    # with open("logs/query_log.jsonl", "a", encoding="utf-8") as f:
-    #     f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
 
 def format_sources(sources: List[Dict]) -> str:
-    """Formata as fontes para exibição amigável."""
+    """Formata as fontes para exibição amigável usando ícone Material."""
     if not sources:
-        return "Nenhuma fonte específica foi utilizada."
+        return "<span class='material-symbols-outlined' style='font-size: 16px; color:#c62828;'>info</span> Nenhuma fonte específica foi utilizada."
     lines = []
     for idx, doc in enumerate(sources, 1):
         source = doc.get("source", "Documento desconhecido")
         page = doc.get("page", "N/A")
         score = doc.get("score", None)
         score_str = f" (similaridade: {score:.3f})" if score is not None else ""
-        lines.append(f"{idx}. **{source}** - Página {page}{score_str}")
+        lines.append(f"{idx}. <span class='material-symbols-outlined' style='font-size:16px; color:#2e7d32;'>description</span> **{source}** - Página {page}{score_str}")
     return "\n".join(lines)
 
 def display_chunks(chunks: List[Dict]):
-    """Exibe os trechos recuperados de forma destacada."""
+    """Exibe os trechos recuperados de forma destacada com ícone Material."""
     if not chunks:
         return
     with st.expander("📄 Trechos recuperados (usados para gerar a resposta)"):
         for i, chunk in enumerate(chunks):
             score = chunk.get("score", 0)
-            st.markdown(f"**Chunk {i+1}** (score: {score:.3f})")
+            st.markdown(f"<span class='material-symbols-outlined' style='color:#2e7d32;'>article</span> **Trecho {i+1}** (similaridade: {score:.3f})", unsafe_allow_html=True)
             st.markdown(f"> {chunk.get('text', '')[:500]}...")
             st.caption(f"Fonte: {chunk.get('source', '')} - Pág. {chunk.get('page', '')}")
             st.divider()
 
 # ============================
-# INTERFACE PRINCIPAL
+# INTERFACE PRINCIPAL - HEADER
 # ============================
-# Cabeçalho
 col1, col2 = st.columns([1, 6])
 with col1:
-    logo_file = os.path.join(BASE_DIR, "logo_jequitiba.png")
-    if os.path.exists(logo_file):
-        st.image(logo_file, width=120)
+    if os.path.exists(logo_path):
+        st.markdown(
+            f'<div class="logo-container"><img src="data:image/png;base64,{st.image(logo_path, width=120)}" style="display:none;"/>'
+            f'<img src="app/static/logo_jequitiba.png" class="logo-img" style="width:100px; height:auto;" onerror="this.onerror=null; this.src=\'https://fonts.gstatic.com/s/i/short-term/release/materialsymbolsoutlined/forest/default/48px.svg\';"/></div>',
+            # Se o path relativo falhar no Streamlit, renderizamos a imagem local normalmente:
+            unsafe_allow_html=True
+        )
+        st.image(logo_path, width=100) # Exibição padrão segura do Streamlit
     else:
-        st.title("🌳")
+        st.markdown("<h1><span class='material-symbols-outlined' style='font-size: 48px; color: #2e7d32;'>forest</span></h1>", unsafe_allow_html=True)
 with col2:
-    st.title("Projeto Jequitibá")
-    st.subheader("Assistente Jurídico Inteligente com RAG e LLMs")
+    st.markdown("<h1 class='app-title'>Projeto Jequitibá</h1>", unsafe_allow_html=True)
+    st.markdown("<p class='app-subtitle'>Assistente Jurídico Inteligente com RAG e LLMs</p>", unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -139,7 +245,8 @@ st.markdown("---")
 # ============================
 with st.sidebar:
     st.image("https://img.shields.io/badge/USP%20ICMC-F7DF1E?style=for-the-badge&logo=school", width=180)
-    st.header("⚙️ Parâmetros do RAG")
+    
+    st.markdown("<h3><span class='material-symbols-outlined'>settings</span> Parâmetros do RAG</h3>", unsafe_allow_html=True)
     
     # Controles deslizantes para ajuste fino
     top_k = st.slider(
@@ -158,7 +265,7 @@ with st.sidebar:
         help="Trechos com score abaixo deste valor serão descartados.",
     )
     
-    # Seletor de modelo (caso o RAG Engine suporte múltiplos)
+    # Seletor de modelo
     model_options = ["gemini-1.5-flash", "gemini-1.5-pro"]
     selected_model = st.selectbox(
         "Modelo LLM",
@@ -175,14 +282,15 @@ with st.sidebar:
         "model": selected_model,
     })
     
-    # Mostrar status do engine
+    # Mostrar status do engine com Material Icons
     if engine:
-        st.success("✅ Motor RAG ativo")
+        st.markdown("<div class='status-active'><span class='material-symbols-outlined'>check_circle</span> Motor RAG ativo</div>", unsafe_allow_html=True)
     else:
-        st.error("❌ Motor RAG indisponível")
+        st.markdown("<div class='status-inactive'><span class='material-symbols-outlined'>cancel</span> Motor RAG indisponível</div>", unsafe_allow_html=True)
     
     st.divider()
-    st.header("📁 Upload de Documentos")
+    
+    st.markdown("<h3><span class='material-symbols-outlined'>upload_file</span> Upload de Documentos</h3>", unsafe_allow_html=True)
     uploaded_files = st.file_uploader(
         "Adicione novos PDFs para indexar (experimental)",
         type=["pdf"],
@@ -190,17 +298,15 @@ with st.sidebar:
         key="file_uploader",
     )
     if uploaded_files:
-        # Aqui você implementaria a lógica de ingestão dinâmica
-        # Por enquanto, apenas avisamos
         st.info("Funcionalidade em desenvolvimento: os arquivos serão indexados em breve.")
-        # st.session_state.uploaded_files.extend(uploaded_files)
     
     st.divider()
-    st.header("📊 Estatísticas da Sessão")
+    
+    st.markdown("<h3><span class='material-symbols-outlined'>analytics</span> Estatísticas</h3>", unsafe_allow_html=True)
     st.metric("Perguntas feitas", len(st.session_state.messages) // 2)
     st.caption(f"ID da conversa: {st.session_state.conversation_id}")
     
-    if st.button("🔄 Nova Conversa"):
+    if st.button("Nova Conversa"):
         st.session_state.messages = []
         st.session_state.conversation_id = hashlib.md5(str(datetime.now()).encode()).hexdigest()[:8]
         st.rerun()
@@ -210,7 +316,7 @@ with st.sidebar:
     **Sobre o Jequitibá**  
     Recupera trechos de documentos jurídicos via embeddings vetoriais e gera respostas fundamentadas, com rastreabilidade total.
     
-    [Repositório no GitHub](https://github.com/fertorresfs/legal-rag-assistant)
+    [Repositório no GitHub](https://github.com/dse-brasil/jequitiba)
     """)
 
 # ============================
@@ -247,7 +353,9 @@ with tab_chat:
                     start_time = time.time()
                     
                     # Chamada ao RAG
-                    with st.spinner("🌳 Jequitibá está analisando os documentos..."):
+                    with st.spinner("Jequitibá está analisando os documentos..."):
+                        # Ícone customizado de processamento
+                        st.markdown("<p style='color:#2e7d32;'><span class='material-symbols-outlined'>forest</span> Buscando e interpretando evidências...</p>", unsafe_allow_html=True)
                         response = engine.generate_answer(
                             query,
                             top_k=top_k,
@@ -267,16 +375,16 @@ with tab_chat:
                     
                 except Exception as e:
                     logger.error(f"Erro durante a geração: {e}")
-                    answer = f"⚠️ Ocorreu um erro ao processar sua pergunta: {str(e)}"
+                    answer = f"<span class='material-symbols-outlined' style='color:#c62828;'>warning</span> Ocorreu um erro ao processar sua pergunta: {str(e)}"
                     sources = []
                     chunks = []
             else:
-                answer = "❌ Sistema indisponível. Verifique a configuração do RAG Engine e as chaves de API."
+                answer = "<span class='material-symbols-outlined' style='color:#c62828;'>error</span> Sistema indisponível. Verifique a configuração do RAG Engine e as chaves de API."
                 sources = []
 
             # Exibir resposta
             full_response = answer
-            message_placeholder.markdown(full_response)
+            message_placeholder.markdown(full_response, unsafe_allow_html=True)
 
             # Exibir trechos recuperados (se houver)
             if chunks:
@@ -285,10 +393,10 @@ with tab_chat:
             # Exibir fontes
             if sources:
                 with st.expander("📚 Ver fontes consultadas (detalhadas)"):
-                    st.markdown(format_sources(sources))
-                    st.caption(f"⏱️ Tempo de resposta: {duration:.2f}s")
+                    st.markdown(format_sources(sources), unsafe_allow_html=True)
+                    st.markdown(f"<p style='font-size: 12px; color: #757575;'><span class='material-symbols-outlined' style='font-size:14px;'>schedule</span> Tempo de resposta: {duration:.2f}s</p>", unsafe_allow_html=True)
             else:
-                st.caption("ℹ️ Nenhuma fonte específica foi citada.")
+                st.markdown("<p style='font-size: 12px; color: #757575;'><span class='material-symbols-outlined' style='font-size:14px;'>info</span> Nenhuma fonte específica foi citada.</p>", unsafe_allow_html=True)
 
             # Salvar no histórico
             st.session_state.messages.append({
@@ -300,7 +408,7 @@ with tab_chat:
             st.rerun()
 
 with tab_datajud:
-    st.header("🔍 Consulta Direta ao Datajud (CNJ)")
+    st.markdown("## <span class='material-symbols-outlined' style='font-size:28px;'>find_in_page</span> Consulta Direta ao Datajud (CNJ)", unsafe_allow_html=True)
     st.markdown("Pesquise metadados e andamento de processos públicos em qualquer tribunal do Brasil em tempo real.")
     
     col_input, col_btn = st.columns([4, 1])
@@ -325,19 +433,19 @@ with tab_datajud:
             proc_data = res["data"]
             court = res["court"]
             
-            st.success(f"✅ Processo localizado no index `{court}`!")
+            st.markdown(f"<p class='status-active'><span class='material-symbols-outlined'>check_circle</span> Processo localizado no index <strong>{court}</strong>!</p>", unsafe_allow_html=True)
             
             col_info1, col_info2 = st.columns(2)
             with col_info1:
-                st.markdown(f"**Número CNJ:** `{dj_client.format_cnj_number(proc_data.get('numeroProcesso', ''))}`")
-                st.markdown(f"**Tribunal/Index:** `{court}`")
-                st.markdown(f"**Classe Processual:** {proc_data.get('classe', {}).get('nome', 'N/A')} (Código: {proc_data.get('classe', {}).get('codigo', 'N/A')})")
-                st.markdown(f"**Grau de Jurisdição:** `{proc_data.get('grau', 'N/A')}`")
+                st.markdown(f"<span class='material-symbols-outlined' style='font-size:18px;'>fingerprint</span> **Número CNJ:** `{dj_client.format_cnj_number(proc_data.get('numeroProcesso', ''))}`", unsafe_allow_html=True)
+                st.markdown(f"<span class='material-symbols-outlined' style='font-size:18px;'>account_balance</span> **Tribunal/Index:** `{court}`", unsafe_allow_html=True)
+                st.markdown(f"<span class='material-symbols-outlined' style='font-size:18px;'>gavel</span> **Classe Processual:** {proc_data.get('classe', {}).get('nome', 'N/A')} (Código: {proc_data.get('classe', {}).get('codigo', 'N/A')})", unsafe_allow_html=True)
+                st.markdown(f"<span class='material-symbols-outlined' style='font-size:18px;'>layers</span> **Grau de Jurisdição:** `{proc_data.get('grau', 'N/A')}`", unsafe_allow_html=True)
             with col_info2:
-                st.markdown(f"**Órgão Julgador:** {proc_data.get('orgaoJulgador', {}).get('nome', 'N/A')} (Código: {proc_data.get('orgaoJulgador', {}).get('codigo', 'N/A')})")
-                st.markdown(f"**Data de Ajuizamento:** {proc_data.get('dataAjuizamento', '').split('T')[0] if proc_data.get('dataAjuizamento') else 'N/A'}")
-                st.markdown(f"**Sistema Eletrônico:** {proc_data.get('sistema', {}).get('nome', 'N/A')}")
-                st.markdown(f"**Formato:** {proc_data.get('formato', {}).get('nome', 'N/A')}")
+                st.markdown(f"<span class='material-symbols-outlined' style='font-size:18px;'>groups</span> **Órgão Julgador:** {proc_data.get('orgaoJulgador', {}).get('nome', 'N/A')} (Código: {proc_data.get('orgaoJulgador', {}).get('codigo', 'N/A')})", unsafe_allow_html=True)
+                st.markdown(f"<span class='material-symbols-outlined' style='font-size:18px;'>calendar_month</span> **Data de Ajuizamento:** {proc_data.get('dataAjuizamento', '').split('T')[0] if proc_data.get('dataAjuizamento') else 'N/A'}", unsafe_allow_html=True)
+                st.markdown(f"<span class='material-symbols-outlined' style='font-size:18px;'>computer</span> **Sistema Eletrônico:** {proc_data.get('sistema', {}).get('nome', 'N/A')}", unsafe_allow_html=True)
+                st.markdown(f"<span class='material-symbols-outlined' style='font-size:18px;'>article</span> **Formato:** {proc_data.get('formato', {}).get('nome', 'N/A')}", unsafe_allow_html=True)
                 
             st.divider()
             
@@ -350,10 +458,10 @@ with tab_datajud:
                             assuntos_list.append(item.get("nome"))
                 elif isinstance(a, dict):
                     assuntos_list.append(a.get("nome"))
-            st.markdown(f"**Assuntos:** {', '.join(assuntos_list) if assuntos_list else 'N/A'}")
+            st.markdown(f"<span class='material-symbols-outlined' style='font-size:18px;'>label</span> **Assuntos:** {', '.join(assuntos_list) if assuntos_list else 'N/A'}", unsafe_allow_html=True)
             
             # Movimentações
-            st.markdown("### ⏳ Linha do Tempo de Movimentações")
+            st.markdown("### <span class='material-symbols-outlined'>history</span> Linha do Tempo de Movimentações", unsafe_allow_html=True)
             movs = proc_data.get("movimentos", [])
             if movs:
                 movs_table = []
