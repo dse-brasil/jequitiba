@@ -7,4 +7,5 @@ pypdf
 python-dotenv
 sentence-transformers
 reportlab
+loguru
 
