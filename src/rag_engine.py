@@ -92,12 +92,39 @@ class JequitibaRAGEngine:
                 embedding_function=self.embeddings
             )
 
-        # 1. Recuperar contextos relevantes com os parâmetros fornecidos
+        # 1. Verificar se há menção a número de processo CNJ na consulta
+        from src.datajud_client import DatajudClient
+        cnj_numbers = DatajudClient.extract_cnj_numbers(query)
+        datajud_docs = []
+        
+        if cnj_numbers:
+            dj_client = DatajudClient()
+            for proc_num in cnj_numbers:
+                print(f"Buscando metadados do processo {proc_num} no Datajud...")
+                res = dj_client.query_process(proc_num)
+                if res.get("success"):
+                    proc_data = res["data"]
+                    court = res["court"]
+                    formatted_text = dj_client.format_process_info(proc_data, court)
+                    datajud_docs.append({
+                        "text": formatted_text,
+                        "source": f"Datajud (Processo {dj_client.format_cnj_number(proc_num)})",
+                        "page": "Metadados",
+                        "score": 1.0
+                    })
+                else:
+                    print(f"Erro ao buscar processo {proc_num} no Datajud: {res.get('error')}")
+
+        # 2. Recuperar contextos relevantes com os parâmetros fornecidos
         retrieved_docs = self.retrieve_relevant_contexts(query, top_k=top_k, score_threshold=score_threshold)
+        
+        # Unir metadados do Datajud aos contextos recuperados do banco vetorial
+        if datajud_docs:
+            retrieved_docs = datajud_docs + retrieved_docs
         
         if not retrieved_docs:
             return {
-                "answer": "Nenhum documento relevante acima do limiar de similaridade configurado foi encontrado na base de dados para responder a esta pergunta.",
+                "answer": "Nenhum documento relevante ou metadados de processo foi encontrado para responder a esta pergunta.",
                 "sources": [],
                 "chunks": []
             }

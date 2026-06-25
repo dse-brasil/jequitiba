@@ -212,87 +212,169 @@ with st.sidebar:
     """)
 
 # ============================
-# ÁREA PRINCIPAL - CHAT
+# ÁREA PRINCIPAL - ABAS
 # ============================
-# Exibir mensagens do histórico
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-        if "sources" in message and message["sources"]:
-            with st.expander("📚 Ver fontes consultadas"):
-                st.markdown(format_sources(message["sources"]))
+tab_chat, tab_datajud = st.tabs(["💬 Chat Jurídico (RAG)", "🔍 Consulta Processual (Datajud)"])
 
-# Input do usuário
-if query := st.chat_input("Faça uma pergunta sobre os contratos ou processos indexados:"):
-    # Adicionar pergunta ao histórico
-    st.session_state.messages.append({"role": "user", "content": query})
-    with st.chat_message("user"):
-        st.markdown(query)
+with tab_chat:
+    # Exibir mensagens do histórico
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+            if "sources" in message and message["sources"]:
+                with st.expander("📚 Ver fontes consultadas"):
+                    st.markdown(format_sources(message["sources"]))
 
-    # Preparar resposta
-    with st.chat_message("assistant"):
-        message_placeholder = st.empty()
-        full_response = ""
-        sources = []
-        chunks = []
-        duration = 0.0
+    # Input do usuário
+    if query := st.chat_input("Faça uma pergunta sobre os contratos ou processos indexados:"):
+        # Adicionar pergunta ao histórico
+        st.session_state.messages.append({"role": "user", "content": query})
+        with st.chat_message("user"):
+            st.markdown(query)
 
-        if engine:
-            try:
-                # Atualizar parâmetros no engine (se suportar)
-                # engine.update_params(top_k=top_k, threshold=threshold, model=selected_model)
-                start_time = time.time()
-                
-                # Chamada ao RAG
-                with st.spinner("🌳 Jequitibá está analisando os documentos..."):
-                    response = engine.generate_answer(
-                        query,
-                        top_k=top_k,
-                        score_threshold=threshold,
-                    )
-                duration = time.time() - start_time
-                
-                answer = response.get("answer", "Desculpe, não foi possível gerar uma resposta.")
-                sources = response.get("sources", [])
-                chunks = response.get("chunks", [])  # idealmente o engine retorna os chunks usados
-                
-                # Se não houver chunks, tentamos extrair do response
-                if not chunks and "retrieved_chunks" in response:
-                    chunks = response["retrieved_chunks"]
-                
-                # Log da consulta
-                log_query(query, answer, sources, duration)
-                
-            except Exception as e:
-                logger.error(f"Erro durante a geração: {e}")
-                answer = f"⚠️ Ocorreu um erro ao processar sua pergunta: {str(e)}"
-                sources = []
-                chunks = []
-        else:
-            answer = "❌ Sistema indisponível. Verifique a configuração do RAG Engine e as chaves de API."
+        # Preparar resposta
+        with st.chat_message("assistant"):
+            message_placeholder = st.empty()
+            full_response = ""
             sources = []
+            chunks = []
+            duration = 0.0
 
-        # Exibir resposta
-        full_response = answer
-        message_placeholder.markdown(full_response)
+            if engine:
+                try:
+                    start_time = time.time()
+                    
+                    # Chamada ao RAG
+                    with st.spinner("🌳 Jequitibá está analisando os documentos..."):
+                        response = engine.generate_answer(
+                            query,
+                            top_k=top_k,
+                            score_threshold=threshold,
+                        )
+                    duration = time.time() - start_time
+                    
+                    answer = response.get("answer", "Desculpe, não foi possível gerar uma resposta.")
+                    sources = response.get("sources", [])
+                    chunks = response.get("chunks", [])
+                    
+                    if not chunks and "retrieved_chunks" in response:
+                        chunks = response["retrieved_chunks"]
+                    
+                    # Log da consulta
+                    log_query(query, answer, sources, duration)
+                    
+                except Exception as e:
+                    logger.error(f"Erro durante a geração: {e}")
+                    answer = f"⚠️ Ocorreu um erro ao processar sua pergunta: {str(e)}"
+                    sources = []
+                    chunks = []
+            else:
+                answer = "❌ Sistema indisponível. Verifique a configuração do RAG Engine e as chaves de API."
+                sources = []
 
-        # Exibir trechos recuperados (se houver)
-        if chunks:
-            display_chunks(chunks)
+            # Exibir resposta
+            full_response = answer
+            message_placeholder.markdown(full_response)
 
-        # Exibir fontes
-        if sources:
-            with st.expander("📚 Ver fontes consultadas (detalhadas)"):
-                st.markdown(format_sources(sources))
-                # Mostrar também o tempo de resposta
-                st.caption(f"⏱️ Tempo de resposta: {duration:.2f}s")
+            # Exibir trechos recuperados (se houver)
+            if chunks:
+                display_chunks(chunks)
+
+            # Exibir fontes
+            if sources:
+                with st.expander("📚 Ver fontes consultadas (detalhadas)"):
+                    st.markdown(format_sources(sources))
+                    st.caption(f"⏱️ Tempo de resposta: {duration:.2f}s")
+            else:
+                st.caption("ℹ️ Nenhuma fonte específica foi citada.")
+
+            # Salvar no histórico
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": full_response,
+                "sources": sources,
+                "chunks": chunks,
+            })
+            st.rerun()
+
+with tab_datajud:
+    st.header("🔍 Consulta Direta ao Datajud (CNJ)")
+    st.markdown("Pesquise metadados e andamento de processos públicos em qualquer tribunal do Brasil em tempo real.")
+    
+    col_input, col_btn = st.columns([4, 1])
+    with col_input:
+        proc_query = st.text_input(
+            "Número do Processo (CNJ)",
+            placeholder="Ex: 0000832-35.2018.4.01.3202",
+            help="Número unificado de 20 dígitos."
+        )
+    with col_btn:
+        st.markdown("<br>", unsafe_allow_html=True)
+        search_btn = st.button("Buscar Processo", use_container_width=True)
+        
+    if search_btn and proc_query:
+        from src.datajud_client import DatajudClient
+        dj_client = DatajudClient()
+        
+        with st.spinner("Consultando base nacional do Datajud..."):
+            res = dj_client.query_process(proc_query)
+            
+        if res.get("success"):
+            proc_data = res["data"]
+            court = res["court"]
+            
+            st.success(f"✅ Processo localizado no index `{court}`!")
+            
+            col_info1, col_info2 = st.columns(2)
+            with col_info1:
+                st.markdown(f"**Número CNJ:** `{dj_client.format_cnj_number(proc_data.get('numeroProcesso', ''))}`")
+                st.markdown(f"**Tribunal/Index:** `{court}`")
+                st.markdown(f"**Classe Processual:** {proc_data.get('classe', {}).get('nome', 'N/A')} (Código: {proc_data.get('classe', {}).get('codigo', 'N/A')})")
+                st.markdown(f"**Grau de Jurisdição:** `{proc_data.get('grau', 'N/A')}`")
+            with col_info2:
+                st.markdown(f"**Órgão Julgador:** {proc_data.get('orgaoJulgador', {}).get('nome', 'N/A')} (Código: {proc_data.get('orgaoJulgador', {}).get('codigo', 'N/A')})")
+                st.markdown(f"**Data de Ajuizamento:** {proc_data.get('dataAjuizamento', '').split('T')[0] if proc_data.get('dataAjuizamento') else 'N/A'}")
+                st.markdown(f"**Sistema Eletrônico:** {proc_data.get('sistema', {}).get('nome', 'N/A')}")
+                st.markdown(f"**Formato:** {proc_data.get('formato', {}).get('nome', 'N/A')}")
+                
+            st.divider()
+            
+            # Assuntos
+            assuntos_list = []
+            for a in proc_data.get("assuntos", []):
+                if isinstance(a, list):
+                    for item in a:
+                        if isinstance(item, dict):
+                            assuntos_list.append(item.get("nome"))
+                elif isinstance(a, dict):
+                    assuntos_list.append(a.get("nome"))
+            st.markdown(f"**Assuntos:** {', '.join(assuntos_list) if assuntos_list else 'N/A'}")
+            
+            # Movimentações
+            st.markdown("### ⏳ Linha do Tempo de Movimentações")
+            movs = proc_data.get("movimentos", [])
+            if movs:
+                movs_table = []
+                for m in movs:
+                    dt = m.get("dataHora", "").replace("T", " ").replace("Z", "")
+                    if dt:
+                        dt = dt[:19]
+                    name = m.get("nome", "N/A")
+                    
+                    comps = []
+                    for c in m.get("complementosTabelados", []):
+                        comps.append(f"{c.get('nome')}: {c.get('valor')}")
+                    comps_str = ", ".join(comps) if comps else ""
+                    
+                    movs_table.append({
+                        "Data/Hora": dt,
+                        "Movimentação": name,
+                        "Complementos/Descrição": comps_str
+                    })
+                
+                movs_table = sorted(movs_table, key=lambda x: x["Data/Hora"], reverse=True)
+                st.dataframe(movs_table, use_container_width=True)
+            else:
+                st.info("Nenhuma movimentação registrada para este processo.")
         else:
-            st.caption("ℹ️ Nenhuma fonte específica foi citada.")
-
-        # Salvar no histórico
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": full_response,
-            "sources": sources,
-            "chunks": chunks,  # opcional, para exibir depois
-        })
+            st.error(res.get("error"))
