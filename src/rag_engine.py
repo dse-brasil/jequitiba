@@ -39,7 +39,7 @@ class JequitibaRAGEngine:
         self.model_name = os.getenv("AI_MODEL") or os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
         print(f"Cliente Gemini carregado com o modelo: {self.model_name}")
 
-    def retrieve_relevant_contexts(self, query: str, top_k: int = 4) -> list:
+    def retrieve_relevant_contexts(self, query: str, top_k: int = 4, score_threshold: float = 0.0) -> list:
         """
         Consulta o ChromaDB para recuperar os trechos mais semelhantes à pergunta.
         """
@@ -47,15 +47,27 @@ class JequitibaRAGEngine:
             print("ChromaDB não inicializado ou sem dados.")
             return []
 
-        # Faz a pesquisa de similaridade
-        results = self.db.similarity_search(query, k=top_k)
+        try:
+            # Tenta buscar com pontuação de relevância (relevance score)
+            results = self.db.similarity_search_with_relevance_scores(
+                query, 
+                k=top_k, 
+                score_threshold=score_threshold
+            )
+        except Exception as e:
+            # Fallback em caso de erro (ex: modelo de distância não mapeado pelo LangChain)
+            print(f"Erro em similarity_search_with_relevance_scores: {e}. Usando busca padrão.")
+            docs = self.db.similarity_search(query, k=top_k)
+            # Retorna com score dummy de 1.0 para manter compatibilidade
+            results = [(doc, 1.0) for doc in docs]
         
         retrieved_docs = []
-        for doc in results:
+        for doc, score in results:
             retrieved_docs.append({
                 "text": doc.page_content,
                 "source": doc.metadata.get("source", "Desconhecido"),
-                "page": doc.metadata.get("page", "N/A")
+                "page": doc.metadata.get("page", "N/A"),
+                "score": score
             })
         return retrieved_docs
 
@@ -69,7 +81,7 @@ class JequitibaRAGEngine:
             formatted += f"{doc.get('text')}\n\n"
         return formatted
 
-    def generate_answer(self, query: str) -> dict:
+    def generate_answer(self, query: str, top_k: int = 4, score_threshold: float = 0.0) -> dict:
         """
         Executa a busca RAG e gera a resposta fundamentada com o Gemini.
         """
@@ -80,13 +92,14 @@ class JequitibaRAGEngine:
                 embedding_function=self.embeddings
             )
 
-        # 1. Recuperar contextos relevantes
-        retrieved_docs = self.retrieve_relevant_contexts(query)
+        # 1. Recuperar contextos relevantes com os parâmetros fornecidos
+        retrieved_docs = self.retrieve_relevant_contexts(query, top_k=top_k, score_threshold=score_threshold)
         
         if not retrieved_docs:
             return {
-                "answer": "Nenhum documento relevante foi encontrado na base de dados para responder a esta pergunta.",
-                "sources": []
+                "answer": "Nenhum documento relevante acima do limiar de similaridade configurado foi encontrado na base de dados para responder a esta pergunta.",
+                "sources": [],
+                "chunks": []
             }
 
         # 2. Formatar o contexto
@@ -107,12 +120,14 @@ class JequitibaRAGEngine:
             )
             return {
                 "answer": response.text,
-                "sources": retrieved_docs
+                "sources": retrieved_docs,
+                "chunks": retrieved_docs
             }
         except Exception as e:
             return {
                 "answer": f"Erro ao gerar resposta com o modelo Gemini: {str(e)}",
-                "sources": []
+                "sources": [],
+                "chunks": []
             }
 
 if __name__ == "__main__":

@@ -85,12 +85,13 @@ class DocumentIngester:
 
         print(f"Indexando {len(chunks)} fragmentos no ChromaDB...")
         
-        # Inicializa o ChromaDB com persistência no diretório configurado
+        # Inicializa o ChromaDB com persistência no diretório configurado usando cosine similarity
         db = Chroma.from_texts(
             texts=texts,
             embedding=self.embeddings,
             metadatas=metadatas,
-            persist_directory=self.vector_store_dir
+            persist_directory=self.vector_store_dir,
+            collection_metadata={"hnsw:space": "cosine"}
         )
         print(f"Banco de dados vetorial salvo com sucesso em: {self.vector_store_dir}")
 
